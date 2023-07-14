@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<!-- saved from url=(0032)https://www.seekho.ai/chrome-app -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <title>Interview Prep</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="./bootstrap.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com/">
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+  <link href="./css2" rel="stylesheet">
+  <link href="./library.css" rel="stylesheet" type="text/css">
+  <link href="./popup.css" rel="stylesheet" type="text/css">
+  <link href="./circular-progress.css" rel="stylesheet" type="text/css">
+  <link rel="stylesheet" href="./quizQuestion.css">
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+
+
+  <script async="" src="./clarity.js.download"></script><script type="text/javascript" async="" src="./js"></script><script async="" src="./saved_resource"></script><script async="" src="./arlmonnqe1"></script><script type="text/javascript" async="" src="./fbevents.js.download"></script><script type="text/javascript" async="" src="./analytics.js.download"></script><script async="" src="./fbevents.js.download"></script><script type="text/javascript" async="" src="./analytics.js.download"></script><script type="text/javascript" async="" src="./js(1)"></script><script async="" src="./gtm.js.download"></script><script async="" src="./js(2)"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+    gtag('config', 'UA-175031722-1');
+  </script>
+
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+      new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-T5W8ZBP');</script>
+  <!-- End Google Tag Manager -->
+
+
+
+
+  <script type="text/javascript">
+		const lmsDomain = 'https://seekho.seekify.com';
+		let token = null;
+
+		function getCookie(cname) {
+			var name = cname + "=";
+			var decodedCookie = decodeURIComponent(document.cookie);
+			var ca = decodedCookie.split(';');
+			for (var i = 0; i < ca.length; i++) {
+				var c = ca[i];
+				while (c.charAt(0) == ' ') {
+					c = c.substring(1);
+				}
+				if (c.indexOf(name) == 0) {
+					return c.substring(name.length, c.length);
+				}
+			}
+			return "";
+		}
+
+		function getPlatform() {
+			let platform = "25"; // DESKTOP_WEB
+			var userAgent = navigator.userAgent || navigator.vendor || window.opera;
+			if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+				platform = "20"; // WEB (Mobile Web)
+			} else if (/android/i.test(userAgent)) {
+				platform = "20"; // WEB (Mobile Web)
+			}
+			return platform;
+		}
+  </script>
+  <script src="./jquery.min.js.download"></script>
+  <script src="./utmParams.js.download"></script>
+  <script src="./seekhoRequest.js.download"></script>
+  <script src="./handlebars.min.js.download"></script>
+  <script src="./handleBar.js.download"></script>
+</head>
+<body>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T5W8ZBP"
+                  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+<div id="seekho-plugin">
+  <div class="container">
+    <div class="bookmarks" id="bookmarks" style="width: 100%"></div>
+  </div>
+  <div class="container">
+    <div id="chatContainer" style="display: none; width: 100%">
+      <div class="row d-flex justify-content-center">
+        <div class="col-md-12 px-0">
+          <div class="card" id="chat1" style="border-radius: 15px; height: 100vh;">
+            <div class="card-header text-title2" style="overflow: auto; flex-direction: row; display: flex; align-items: center;" id="chatHeader"></div>
+            <div class="card-body" style="flex: 1 1 0%; overflow: auto;" id="chatBox">
+              <div class="loader" id="loader"></div>
+            </div>
+            <div id="card-footer" style="flex-direction: column; display: flex; justify-content: center; background: #ECF1F4; position: relative">
+              <div class="card-footer py-4" style="background-color: transparent; border-top: 0">
+                <div class="form-outline">
+                  <div class="chat-textarea-wrapper mb-3">
+                  <textarea class="form-control chat-textarea mb-0" id="answer" rows="1"></textarea>
+                  </div>
+                  <div class="form-outline d-flex" style="justify-content: space-between; align-items: center">
+                    <div>
+                      <span id="char-count" style="font-size: 12px;color: #c4c4c4;">0/150</span>
+                      <span style="font-size: 12px;">(min 10 words)</span>
+                    </div>
+                    <div class="d-flex" style="column-gap: 15px; align-items: center">
+                      <button style="float: left; flex: 1; box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.15); border: 2px solid #ECF1F4;" class="btn btn-secondary-hollow btn-sm" id="finishInterview">Finish</button>
+                      <button style="float: right;padding: 0px;width: 37px;height: 37px; box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.15);" class="btn btn-primary btn-sm rounded" id="submitAnswer">
+                        <img src="./1688655011606-send.png" style="width: 20px; height: 20px;">
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="position: absolute; height: 100%; width: 100%; background: white; align-items: center; justify-content: center; display: none" id="close-conversation">
+                This conversation is closed!
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script id="questionsCardHB" type="text/x-handlebars-template">
+  <div id="questionCard" class="w-100 card border-0 background-tertiary-200 py-2 my-2">
+    <div class="questions-container">
+      <h5 class="text-body tertiary-color-text text-body questions-displayText">{{{question.displayText}}}</h5>
+<!--      {{#if question.hint}}-->
+<!--        <p class="primary-color-text text-title3 show-hint" style="cursor: pointer">Looking for a hint ?</p>-->
+<!--        <p class="secondary-color-text text-smallcta question-hint my-2" style="display: none">{{question.hint}}</p>-->
+<!--      {{/if}}-->
+      {{#ifCond question.competencyLevel '==' "ADVANCED"}}
+        <span class=" px-2 py-1 my-1 text-smallcta primary-color-text background-primary-50 border-radius-2">
+          {{question.competencyLevel}}
+        </span>
+      {{/ifCond}}
+      {{#ifCond question.competencyLevel '==' "INTERMEDIATE"}}
+      <span class=" px-2 py-1 my-1 text-smallcta primary-color-text background-primary-50 border-radius-2">
+          {{question.competencyLevel}}
+        </span>
+      {{/ifCond}}
+      {{#ifCond question.competencyLevel '==' "BEGINNER"}}
+      <span class=" px-2 py-1 my-1 text-smallcta primary-color-text background-primary-50 border-radius-2">
+          {{question.competencyLevel}}
+        </span>
+      {{/ifCond}}
+    </div>
+    <div class="card-body">
+      <ul class="list-group list-group-flush">
+        {{#each question.questionOptions as |option|}}
+          {{#ifCond ../question.questionType '==' 'SINGLE_SELECT_MCQ' }}
+              <li class="disable-btn list-group-item border-0 border-option p-2 mb-3 d-flex align-items-baseline text-shortcopy option-content">
+                <label class="saveAnswerButton w-100 mb-0 tertiary-color-text" for="{{option.hash}}">
+                  <input name="right-answer" id="{{option.hash}}" class="question-option mr-2" data-optionhash="{{option.hash}}" type="radio" {{#if option.isSelected}} checked {{/if}} />
+                  {{#if option.displayText}}
+                    {{option.displayText}}
+                  {{else}}
+                    <img class="option-image" src="{{option.displayImageDTO.imgUrl}}" alt="option" style="max-height: 180px"/>
+                  {{/if}}
+                </label>
+              </li>
+          {{/ifCond}}
+          {{#ifCond ../question.questionType '==' 'SINGLE_SELECT_PERSONALITY' }}
+            <li class="disable-btn list-group-item border-0 border-option p-2 mb-3 d-flex align-items-baseline text-shortcopy option-content">
+              <label class="saveAnswerButton w-100 mb-0 tertiary-color-text" for="{{option.hash}}">
+                <input name="right-answer" id="{{option.hash}}" class="question-option mr-2" data-optionhash="{{option.hash}}" type="radio" {{#if option.isSelected}} checked {{/if}} />
+                  {{option.displayText}}
+              </label>
+            </li>
+          {{/ifCond}}
+          {{#ifCond ../question.questionType '==' 'MULTI_SELECT_MCQ' }}
+            <li class="disable-btn list-group-item border-0 border-option p-2 mb-3 d-flex align-items-baseline text-shortcopy option-content">
+              <label class="saveAnswerButton w-100 mb-0 tertiary-color-text" for="{{option.hash}}">
+                <input name="right-answer-{{@index}}" id="{{option.hash}}" class="question-option mr-2" data-optionhash="{{option.hash}}" type="checkbox" {{#if option.isSelected}} checked {{/if}} />
+                {{#if option.displayText}}
+                  {{option.displayText}}
+                {{else}}
+                <img class="option-image" src="{{option.displayImageDTO.imgUrl}}" alt="option" style="max-height: 180px"/>
+                {{/if}}
+              </label>
+            </li>
+          {{/ifCond}}
+        {{#ifCond ../question.questionType '==' 'SUBJECTIVE' }}
+        <li class="disable-btn list-group-item border-0 border-option p-2 mb-3 d-flex align-items-baseline text-shortcopy option-content">
+            <textarea class="saveAnswerButton subjectiveAnswer form-control subjective-answer" id="{{option.hash}}" data-optionhash="{{option.hash}}" placeholder="Type in your answer" rows="5">{{../comment}}</textarea>
+        </li>
+        {{/ifCond}}
+      {{/each}}
+      </ul>
+    </div>
+    <div class="card-footer border-0 bg-white text-right" id="quiz-action">
+       <button id="next-button" class="btn btn-primary disable-btn">Next</button>
+    </div>
+  </div>
+</script>
+<script src="./assessment.js.download"></script>
+<script src="./assignments.js.download"></script>
+<script type="module" src="./popup.js.download"></script>
+
+
+<script type="text/javascript" id="">!function(b,e,f,g,a,c,d){b.fbq||(a=b.fbq=function(){a.callMethod?a.callMethod.apply(a,arguments):a.queue.push(arguments)},b._fbq||(b._fbq=a),a.push=a,a.loaded=!0,a.version="2.0",a.queue=[],c=e.createElement(f),c.async=!0,c.src=g,d=e.getElementsByTagName(f)[0],d.parentNode.insertBefore(c,d))}(window,document,"script","https://connect.facebook.net/en_US/fbevents.js");fbq("init","549662456197936");fbq("track","PageView");</script>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=549662456197936&amp;ev=PageView&amp;noscript=1"></noscript>
+<script type="text/javascript" id="">(function(a,e,b,f,g,c,d){a[b]=a[b]||function(){(a[b].q=a[b].q||[]).push(arguments)};c=e.createElement(f);c.async=1;c.src="https://www.clarity.ms/tag/"+g+"?ref\x3dgtm2";d=e.getElementsByTagName(f)[0];d.parentNode.insertBefore(c,d)})(window,document,"clarity","script","arlmonnqe1");</script><script type="text/javascript" id="">!function(a,e,f,k,h,g,c,b,d){a.AppsFlyerSdkObject=h;a.AF=a.AF||function(){(a.AF.q=a.AF.q||[]).push([Date.now()].concat(Array.prototype.slice.call(arguments)))};a.AF.id=a.AF.id||c;a.AF.plugins={};b=e.createElement(f);d=e.getElementsByTagName(f)[0];b.async=1;b.src="https://websdk.appsflyer.com?"+(0<g.length?"st\x3d"+g.split(",").sort().join(",")+"\x26":"")+(0<c.length?"af_id\x3d"+c:"");d.parentNode.insertBefore(b,d)}(window,document,"script",0,"AF","banners",{banners:{key:"a377a604-f406-4446-b9b8-dae659aafba1"}});
+AF("banners","showBanner");</script></body></html>

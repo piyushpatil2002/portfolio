@@ -1,0 +1,702 @@
+import {addElementToDOM, addMessageToDOM, isJsonString, Timer} from "./utils.js";
+import {
+	loggedInUser,
+	userLogin,
+	userOtp,
+	startConversation,
+	resumeConversation,
+	finishConversation,
+	getJobThreads,
+	getThreadMessages,
+	checkIfUserExists,
+	createUser,
+	generateAnswer,
+	initializeBot,
+	getJobByExternalUrl,
+	getUserDataAndLogin,
+	createRetryRequest, feedbackConversation
+} from "./service.js";
+
+import {
+	loadingErrorScreen,
+	loadingInterViewScreen,
+	loginFormTemplate,
+	chatIndicator,
+	receiverMessageTemplate,
+	senderMessageTemplate, timerTemplate, receiverFeedbackMessageTemplate,
+} from "./template.js"
+
+import Quiz from "./quiz.js"
+import Rating from "./rating.js";
+
+let messageCount = 0;
+let newUser =  false;
+let preEvent = null;
+const timer = new Timer()
+const rating = new Rating({entityType: 'CHAT_THREAD'});
+const iframeButton = createIframeButtonElement();
+
+const initiateConversation = createRetryRequest(startConversation);
+const resumeConversationWithRetry = createRetryRequest(resumeConversation);
+const finishUserConversation = createRetryRequest(finishConversation);
+const feedbackUserConversation = createRetryRequest(feedbackConversation);
+const generateAnswerWithRetry = createRetryRequest(generateAnswer);
+
+const addLoginInputs = () => {
+	if (!document.getElementById("loginForm")) {
+		const bookmarksElement = document.getElementById("bookmarks");
+		const loginTemplate = loginFormTemplate()
+		
+		const divElement = document.createElement('div');
+		divElement.id = 'loginForm'
+		divElement.style.padding = '40px'
+		divElement.style.marginTop = '20%'
+		divElement.innerHTML = loginTemplate;
+		
+		bookmarksElement.appendChild(divElement)
+		
+		const otpButtonElement = document.getElementById("otpButton");
+		const buttonElement = document.getElementById("login");
+		const socialButtonElement = document.getElementById("social");
+		
+		buttonElement.removeEventListener('click', onUserLogin)
+		otpButtonElement.removeEventListener('click', onUserOtp)
+		socialButtonElement.removeEventListener('click', onSocialLogin)
+		
+		buttonElement.addEventListener('click', onUserLogin)
+		otpButtonElement.addEventListener('click', onUserOtp)
+		socialButtonElement.addEventListener('click', onSocialLogin)
+		
+		buttonElement.style.display = 'none'
+	}
+}
+
+const onSocialLogin = async () =>{
+	const socialElement = document.getElementById('social')
+	socialElement.disabled = true;
+	window.parent.postMessage(JSON.stringify({
+		type: 'GOOGLE_LOGIN',
+	}), '*');
+}
+
+const onUserOtp = async () => {
+	const emailElement = document.getElementById("email");
+	const loginButtonElement = document.getElementById("login");
+	
+	const nameSectionElement = document.getElementById("nameSection");
+	const otpSectionElement = document.getElementById("otpSection");
+	const otpButtonElement = document.getElementById("otpButton");
+	
+	const email = emailElement.value
+	const userExistResponse = await checkIfUserExists(email)
+	const isUserExists = await userExistResponse.json().then((res)=> Boolean(res.data))
+	
+	if(!isUserExists) {
+		nameSectionElement.style.display = 'block'
+		newUser = true;
+	}
+	
+	const response = await userOtp(email);
+	
+	if (response?.status === 200) {
+		emailElement.readOnly = true
+		otpSectionElement.style.display = 'block'
+		loginButtonElement.style.display = 'block'
+		otpButtonElement.style.display = 'none'
+	}
+}
+
+const onUserLogin = async () => {
+	const loginButton = document.getElementById("login");
+	try {
+		const emailElement = document.getElementById("email");
+		const otpElement = document.getElementById("otp");
+		const nameElement = document.getElementById("name");
+		
+		if(!Boolean(otpElement?.value) || otpElement?.value?.length !== 4) return;
+		if(newUser && (!Boolean(nameElement?.value) || nameElement?.value?.length < 3)) return;
+		
+		loginButton.disabled = true;
+		
+		if(newUser) {
+			await createUser({email: emailElement.value, name: nameElement.value, otp: otpElement.value})
+		}
+		
+		await userLogin({email: emailElement.value, otp: otpElement.value})
+	} catch (e) {
+		loginButton.disabled = false;
+		console.log(e)
+	}
+}
+
+const userInfoValidate = async () => {
+	const bookmarksElement = document.getElementById("bookmarks");
+	if (!loggedInUser?.user?.userStatus) {
+		bookmarksElement.innerHTML = '';
+		addLoginInputs();
+	}
+};
+
+function truncate(words = '', maxlength) {
+	if (words.length <= maxlength) {
+		return words
+	}
+	return `${words.slice(0, maxlength)} …`
+}
+
+function createCloseButton(callback) {
+	const closeElement = document.createElement("span");
+	closeElement.innerHTML = '✕'
+	closeElement.id = 'close';
+	closeElement.style.cursor = 'pointer';
+	closeElement.style.position = 'absolute';
+	closeElement.style.right = '20px';
+	closeElement.style.top = '10px';
+	closeElement.style.zIndex = '1';
+	
+	closeElement.addEventListener('click', function () {
+		const chatContainerElement = document.getElementById("chatContainer");
+		window.parent.postMessage(JSON.stringify({type: 'CLOSE'}), '*');
+		iframeButton.style.display = 'block'
+		chatContainerElement.style.display = 'none'
+		if (callback) {
+			callback()
+		}
+	})
+	
+	return closeElement
+}
+
+function addHeaderSection() {
+	const chatHeaderElement = document.getElementById("chatHeader");
+	const chatHeaderImage = document.createElement("img")
+	const headerInfoElement = document.createElement("div");
+	const headerTitleElement = document.createElement("div");
+	const headerCompanyElement = document.createElement("div");
+	
+	chatHeaderElement.innerHTML = '';
+	
+	chatHeaderImage.src = '/assets/images/seekho_s.png';
+	chatHeaderImage.className = 'seekho-round-square';
+	
+	headerInfoElement.style.paddingLeft = '10px'
+	headerInfoElement.style.paddingRight = '10px'
+	headerInfoElement.style.textAlign = 'center'
+	headerInfoElement.style.flexGrow = '1'
+	
+	headerTitleElement.className = 'primary-color-text'
+	headerTitleElement.style.marginBottom = '8px'
+	
+	headerCompanyElement.className = 'text-title3 tertiary-color-text'
+	headerCompanyElement.style.fontSize = '12px'
+	
+	headerInfoElement.append(headerTitleElement)
+	headerInfoElement.append(headerCompanyElement)
+	
+	chatHeaderElement.innerHTML = '';
+	
+	chatHeaderElement.append(chatHeaderImage)
+	chatHeaderElement.append(headerInfoElement)
+	addElementToDOM(timerTemplate(), chatHeaderElement)
+	
+	return {
+		chatHeaderElement,
+		headerTitleElement,
+		headerCompanyElement,
+	}
+}
+
+function addChatContainer() {
+	const chatContainerElement = document.getElementById("chatContainer");
+	const bookmarksElement = document.getElementById("bookmarks");
+	const chatBoxElement = document.getElementById("chatBox");
+	const closeConversationElement = document.getElementById('close-conversation');
+	const {chatHeaderElement, headerTitleElement, headerCompanyElement} = addHeaderSection()
+	
+	const closeElement = createCloseButton();
+	chatHeaderElement.append(closeElement);
+	
+	closeConversationElement.style.display = 'none';
+	
+	chatBoxElement.innerHTML = '';
+	
+	const chatBoxHeight = 'calc(100vh - 248px)'
+	
+	chatBoxElement.style.height = `${chatBoxHeight}`
+	
+	chatContainerElement.style.display = 'block'
+	
+	bookmarksElement.innerHTML = '';
+	bookmarksElement.style.display = 'none'
+	
+	return {
+		headerTitleElement,
+		headerCompanyElement,
+	}
+}
+
+function addDelay(delay = 1000) {
+	return new Promise((resolve) => setTimeout(() => resolve(), delay))
+}
+
+async function initChat(job = {}) {
+	try {
+		const {headerTitleElement, headerCompanyElement} = addChatContainer(job);
+		const interPrepLoadingElem = addInterPrepLoadingScreen();
+		const progressElem = document.getElementById('prepare-interview-progress');
+		const submitAnswerElement = document.getElementById('submitAnswer');
+		const finishInterviewElement = document.getElementById('finishInterview');
+		finishInterviewElement.disabled = true
+		submitAnswerElement.disabled = true
+		
+		const {title: jobTitle = '', pageText, url} = job || {}
+		const jobResponse = await getJobByExternalUrl({externalUrl: url})
+		const jobResponseData = await jobResponse.json();
+		
+		const {jobId, organisationDTO = {}, title} = jobResponseData?.data || {}
+		
+		let loadingJobDetail = true;
+		const quiz = new Quiz('CT-131-49561', {token: loggedInUser.token});
+		
+		/*setTimeout(async () => {
+			if(loadingJobDetail) {
+				const quizContainerElem = document.getElementById('quiz-container');
+				const timeCounterElem = document.querySelector('.timeCounter');
+				timeCounterElem.style.display = 'block';
+				quizContainerElem.style.flex = '1';
+				await quiz.init();
+			}
+		}, 2000);
+		
+		const externalJobData = await getOrCreateUserExternalJob({
+			jobTitle, jobDescription, companyName, companyWebsite, pageText, url
+		}).then(async (response)=> {
+			return new Promise((resolve)=> {
+				loadingJobDetail = false;
+				setTimeout(() => {
+					quiz.finish()
+					resolve(response)
+				}, 5000)
+			})
+		});*/
+		
+		progressElem.className = 'progress-bar bg-success'
+		progressElem.style.width = '70%'
+		
+		/*if (!externalJobData?.data) {
+			interPrepLoadingElem.remove();
+			addErrorLoadingScreen();
+			return;
+		}
+		
+		const {jobId, entitySummary, organisationDTO, title} = externalJobData?.data || {}
+		*/
+		
+		headerTitleElement.innerHTML = `${truncate(title || jobTitle, 26)}`
+		headerCompanyElement.innerHTML = `${truncate(organisationDTO?.name, 26)}`
+		
+		progressElem.style.width = '100%';
+		await addDelay(2000);
+		interPrepLoadingElem.remove()
+		
+		await initInterview({pageText, url, jobId})
+	} catch (e) {
+		console.log(e)
+	}
+}
+
+async function initInterview({jobId, jobRoleId, jobDescription, pageText, url}){
+	if(preEvent) {
+		preEvent.remove()
+	}
+	
+	const submitAnswerElement = document.getElementById('submitAnswer')
+	const finishInterviewElement = document.getElementById('finishInterview')
+	const userInputElement = document.getElementById('answer');
+	
+	const chatThreadMessages = await fetchAndAddJobThread({jobId})
+	const chatThreadMessagesLength = chatThreadMessages?.length || 0
+	
+	let chatThreadHash = chatThreadMessages?.[chatThreadMessages?.length - 1]?.chatThreadHash;
+	let chatThreadId = chatThreadMessages?.[chatThreadMessages?.length - 1]?.chatThreadId;
+	
+	timer.initCountdown()
+	
+	if(chatThreadMessagesLength === 0) {
+		const initializeBotResponse = await initializeBot('seekho-interviewpro');
+		const initializeBotData = await initializeBotResponse.json()
+		const botTemplate = receiverMessageTemplate(initializeBotData?.data || 'Something went wrong. Please try again!');
+		addMessageToDOM(botTemplate);
+		
+		const indicatorElement = addIndicator()
+		const initiateConversationResponse = await initiateConversation({jobId, jobRoleId, jobDescription, pageText, url})
+		const initiateConversationData = await initiateConversationResponse.json()
+		chatThreadHash = initiateConversationData?.data?.chatThreadHash
+		chatThreadId = initiateConversationData?.data?.chatThreadId
+		messageCount = 0;
+		
+		const template = receiverMessageTemplate(initiateConversationData?.data?.response || 'Something went wrong. Please try again!');
+		indicatorElement.remove()
+		const latestMessageElement = addMessageToDOM(template);
+		
+		if(initiateConversationData?.data?.response) {
+			submitAnswerElement.disabled = false;
+		} else {
+			const retryButtonElement = createRetryButton(async () => {
+				const chatBoxElement = document.getElementById("chatBox");
+				chatBoxElement.innerHTML = '';
+				await initInterview({jobId, jobRoleId, jobDescription, pageText, url})
+			});
+			
+			latestMessageElement.firstElementChild.lastElementChild.append(retryButtonElement)
+			return;
+		}
+	}
+	
+	finishInterviewElement.disabled = chatThreadMessagesLength < 6;
+	
+	const sendMessageWithChatThreadHash = () => sendMessage(chatThreadHash)
+	const finishInterviewWithChatThreadHash = () => finishInterview(chatThreadHash, chatThreadId)
+	
+	userInputElement.addEventListener('input', onTextInputChange)
+	submitAnswerElement.addEventListener('click', sendMessageWithChatThreadHash)
+	finishInterviewElement.addEventListener('click', finishInterviewWithChatThreadHash)
+	
+	preEvent = {
+		remove: () => {
+			userInputElement.removeEventListener('input', onTextInputChange)
+			submitAnswerElement.removeEventListener('click', sendMessageWithChatThreadHash)
+			finishInterviewElement.removeEventListener('click', finishInterviewWithChatThreadHash)
+			timer.clear()
+		}
+	}
+}
+
+async function initBot({slug = 'seekho', name, shortBio, entityType, entityId} = {}){
+	const {headerTitleElement, headerCompanyElement} = addChatContainer()
+	headerTitleElement.innerHTML = name
+	headerCompanyElement.innerHTML = shortBio
+	const submitAnswerElement = document.getElementById('submitAnswer')
+	const userInputElement = document.getElementById('answer');
+	const finishInterviewElement = document.getElementById('finishInterview');
+	finishInterviewElement && finishInterviewElement.remove()
+	
+	const indicatorElement = addIndicator()
+	const initializeBotResponse = await initializeBot(slug);
+	const initializeBotData = await initializeBotResponse.json()
+	const template = receiverMessageTemplate(initializeBotData?.data || 'Something went wrong. Please try again!');
+	indicatorElement.remove()
+	addMessageToDOM(template);
+	
+	if(preEvent) {
+		preEvent.remove()
+	}
+	
+	const sendMessageWithBotInfo = () => sendBotMessage({entityId, entityType, slug})
+	userInputElement.addEventListener('input', onTextInputChange)
+	submitAnswerElement.addEventListener('click', sendMessageWithBotInfo)
+	
+	preEvent = {
+		remove: ()=> {
+			userInputElement.removeEventListener('input', onTextInputChange)
+			submitAnswerElement.removeEventListener('click', sendMessageWithBotInfo)
+		}
+	}
+}
+
+async function resumeUserConversation({answer, chatThreadHash, latestMessageElement}) {
+	const indicatorElement = addIndicator()
+	const serverMessageResponse = await resumeConversationWithRetry({answer, chatThreadHash})
+	indicatorElement.remove();
+	
+	if (serverMessageResponse.status === 500) {
+		const retryButtonElement = createRetryButton(async () => await resumeUserConversation({answer, chatThreadHash, latestMessageElement}))
+		latestMessageElement.firstElementChild.lastElementChild.append(retryButtonElement)
+		return retryButtonElement;
+	}
+	
+	const serverMessageData = await serverMessageResponse.json()
+	const receiverTemplate = receiverMessageTemplate(serverMessageData?.data?.response || 'Please try again')
+	return addMessageToDOM(receiverTemplate);
+}
+
+async function fetchAndAddJobThread({jobId}) {
+	if(jobId) {
+		const jobThreadResponse = await getJobThreads({jobId});
+		const jobThreadDataAll = await jobThreadResponse.json();
+		const jobThreadData = jobThreadDataAll?.data?.filter((thread) => thread.status !== 'CLOSED' )
+		if (jobThreadData && jobThreadData?.length > 0) {
+			const jobThreadMessageResponse = await getThreadMessages({chatThreadHash: jobThreadData[0].hash});
+			const jobThreadMessageData = await jobThreadMessageResponse.json();
+			jobThreadMessageData.data.forEach((message) => {
+				let template = null
+				if (message.role === 'USER') {
+					template = senderMessageTemplate(message.textMessage)
+				} else {
+					template = receiverMessageTemplate(message.textMessage)
+				}
+				addMessageToDOM(template)
+			})
+			return jobThreadMessageData.data || []
+		}
+	}
+	return []
+}
+
+function addInterPrepLoadingScreen() {
+	const interviewPrepTemplate = loadingInterViewScreen()
+	const seekhoPluginElement = document.getElementById('seekho-plugin');
+	const loadingElem = addElementToDOM(interviewPrepTemplate, seekhoPluginElement);
+	
+	const closeElement = createCloseButton(function () {
+		loadingElem.remove()
+	});
+	
+	closeElement.style.color = 'white'
+	loadingElem.append(closeElement);
+	return loadingElem
+}
+
+function reloadIframe() {
+	window.parent.postMessage(JSON.stringify({type: 'RELOAD'}), '*');
+}
+
+function addErrorLoadingScreen() {
+	const interviewPrepErrorTemplate = loadingErrorScreen()
+	const seekhoPluginElement = document.getElementById('seekho-plugin');
+	const errorLoadingElem = addElementToDOM(interviewPrepErrorTemplate, seekhoPluginElement);
+	
+	const reloadButton = document.getElementById('reload')
+	reloadButton.removeEventListener('click', reloadIframe)
+	reloadButton.addEventListener('click', reloadIframe)
+	
+	const closeElement = createCloseButton(function () {
+		errorLoadingElem.remove()
+	});
+	errorLoadingElem.append(closeElement);
+	return errorLoadingElem
+}
+
+function addIndicator() {
+	const indicatorTemplate = chatIndicator()
+	return addMessageToDOM(indicatorTemplate)
+}
+
+function resizeTextarea(){
+	const ta = document.getElementById('answer');
+	setTimeout(function() {
+		ta. style.cssText = 'height:0px';
+		const height = Math.min(20 * 8, ta.scrollHeight);
+		ta. style.cssText = 'height:' + height + 'px';
+	},0);
+}
+
+function onTextInputChange(e) {
+	const submitAnswerElement = document.getElementById('submitAnswer');
+	const charCountElement = document.getElementById('char-count');
+	
+	const count = e.target.value?.split(' ')?.length || 0
+	charCountElement.innerHTML = `${count}/150`
+	if (count >= 10 && count <= 150) {
+		charCountElement.style.color = '#c4c4c4';
+		submitAnswerElement.disabled = false
+	} else {
+		charCountElement.style.color = 'red';
+		submitAnswerElement.disabled = true;
+	}
+	 resizeTextarea()
+}
+
+async function sendBotMessage({entityType, entityId, slug}) {
+	const userInputElement = document.getElementById('answer');
+	const charCountElement = document.getElementById('char-count');
+	
+	const userMessage = userInputElement.value;
+	
+	if (!Boolean(userMessage)) return;
+	
+	const template = senderMessageTemplate(userMessage)
+	addMessageToDOM(template)
+	userInputElement.value = ''
+	resizeTextarea();
+	charCountElement.innerHTML = '0/150'
+	
+	await generateBotMessage({
+		text: userMessage,
+		entityId,
+		entityType,
+		botSlug: slug,
+	})
+}
+
+async function generateBotMessage({text, entityId, entityType, botSlug}){
+	const submitAnswerElement = document.getElementById('submitAnswer');
+	submitAnswerElement.disabled = true;
+	const indicatorElement = addIndicator()
+	
+	const serverMessageResponse = await generateAnswerWithRetry({
+		text,
+		entityId,
+		entityType,
+		botSlug,
+	})
+	
+	const serverMessageData = await serverMessageResponse.json()
+	const receiverTemplate = receiverMessageTemplate(serverMessageData?.data?.textMessage || 'Please try again')
+	const latestMessageElement = addMessageToDOM(receiverTemplate);
+	
+	indicatorElement.remove()
+	submitAnswerElement.disabled = false;
+	
+	if (serverMessageResponse.status === 500) {
+		const retryButtonElement = createRetryButton(async () => await generateBotMessage({text, entityId, entityType, botSlug}))
+		latestMessageElement.firstElementChild.lastElementChild.append(retryButtonElement)
+	}
+}
+
+async function sendMessage(chatThreadHash) {
+	const finishInterviewElement = document.getElementById('finishInterview')
+	const submitAnswerElement = document.getElementById('submitAnswer');
+	const userInputElement = document.getElementById('answer');
+	const charCountElement = document.getElementById('char-count');
+	
+	const userMessage = userInputElement.value;
+	
+	if (!Boolean(userMessage)) return;
+	
+	submitAnswerElement.disabled = true
+	const template = senderMessageTemplate(userMessage)
+	const latestMessageElement = addMessageToDOM(template)
+	userInputElement.value = ''
+	resizeTextarea()
+	charCountElement.innerHTML = '0/150'
+	messageCount++
+	
+	if (messageCount > 2) {
+		finishInterviewElement.disabled = false;
+	}
+	
+	if(messageCount > 5) {
+		await finishInterview(chatThreadHash)
+	} else {
+		await resumeUserConversation({answer: userMessage, chatThreadHash, latestMessageElement})
+	}
+	submitAnswerElement.disabled = false
+}
+
+function createRetryButton(retryAction) {
+	const divElement = document.createElement('span');
+	divElement.innerHTML = 'Message failed. Retry'
+	divElement.style.color = 'red'
+	divElement.style.fontSize = '12px'
+	divElement.style.marginLeft = '10px'
+	divElement.style.textDecoration = 'underline'
+	divElement.style.cursor = 'pointer'
+	
+	const resendMessage = async () => {
+		divElement.removeEventListener('click', resendMessage)
+		divElement.remove();
+		if (retryAction) retryAction()
+	}
+	
+	divElement.addEventListener('click', resendMessage)
+	return divElement
+}
+
+async function finishInterview(chatThreadHash, chatThreadId) {
+	const finishInterviewElement = document.getElementById('finishInterview')
+	const submitAnswerElement = document.getElementById('submitAnswer');
+	const closeConversationElement = document.getElementById('close-conversation');
+	
+	finishInterviewElement.disabled = true
+	submitAnswerElement.disabled = true
+	
+	const footerElement = document.getElementById('card-footer');
+	
+	const indicatorElement = addIndicator()
+	timer.clear();
+	
+	await finishUserConversation({chatThreadHash});
+	
+	const serverMessageResponse = await feedbackUserConversation({chatThreadHash})
+	const serverMessageData = await serverMessageResponse.json()
+	const receiverTemplate = receiverFeedbackMessageTemplate(serverMessageData?.data?.response || null)
+	
+	indicatorElement.remove();
+	addMessageToDOM(receiverTemplate);
+	
+	footerElement.style.textAlign = 'center';
+	if(closeConversationElement) {
+		const timeout = setTimeout(()=> rating.render({entityId: chatThreadId}), 5000)
+		closeConversationElement.style.display = 'flex';
+		
+		const rateUsElem = document.createElement('div');
+		rateUsElem.innerHTML = 'Rate us';
+		rateUsElem.style.color = '#4AA571'
+		rateUsElem.style.padding = '8px'
+		rateUsElem.style.cursor = 'pointer'
+		
+		rateUsElem.addEventListener('click', function (){
+			if(timeout) {
+				clearTimeout(timeout)
+			}
+			
+			rating.render({entityId: chatThreadId});
+		})
+		
+		closeConversationElement.appendChild(rateUsElem);
+	}
+}
+
+function createIframeButtonElement() {
+	const iframeButton = document.createElement('button');
+	const imgElem = document.createElement('img');
+	imgElem.src = 'https://seekify-public.s3.ap-south-1.amazonaws.com/0000_static_files/ext-icon.png';
+	imgElem.style.height = '25px'
+	imgElem.style.backgroundColor = 'white'
+	
+	//iframeButton.innerHTML = 'Seekho'
+	iframeButton.id = 'seekhoChatButton'
+	iframeButton.style = 'position: fixed; right: 6px; bottom: 6px; z-index: 1000; width: 50px; height: 50px; background: purple; border: none; border-radius: 25px; color: white; box-shadow: 0 5px 30px 0 rgba(0, 0, 0, 0.15), 0 5px 4px 0 rgba(0, 0, 0, 0.26) !important; background: white;'
+	iframeButton.append(imgElem)
+	
+	iframeButton.addEventListener('click',  function (){
+		window.parent.postMessage(JSON.stringify({type: 'OPEN'}), '*');
+		iframeButton.style.display = 'none'
+	})
+	return iframeButton
+}
+
+window.addEventListener('message', async function (e) {
+	const data = isJsonString(e.data) ? JSON.parse(e.data) : e.data
+	const {type, data: user, botInfo = {}, token, error} = data
+	if (type === 'USER_INFO') {
+		loggedInUser.user = data
+		await userInfoValidate();
+	} else if (type === 'JOB_INFO') {
+		await initChat(data?.job)
+	} else if (type === 'INIT_BOT') {
+		loggedInUser.user = user;
+		await initBot(botInfo);
+	} else if (type === 'CHAT_SETUP') {
+		loggedInUser.user = user;
+		document.body.appendChild(iframeButton);
+	} else if (type === 'LOGIN') {
+		addLoginInputs();
+	} else if (type === 'SOCIAL_LOGIN') {
+		if(error) {
+			const socialElement = document.getElementById('social');
+			socialElement.disabled = false;
+			return;
+		}
+		getUserDataAndLogin({token})
+	}
+});
+
+/**
+ * Exporting functions for external use *
+ */
+window.loggedInUser = (user) => loggedInUser.user = user;
+window.initInterview = initInterview;
+window.initBot = initBot;
+
